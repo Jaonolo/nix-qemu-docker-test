@@ -19,7 +19,7 @@ jobs:
         uses: DeterminateSystems/nix-installer-action@v16
 
       - name: Enable Nix cache
-        uses: DeterminateSystems/flakehub-cache-action@v9
+        uses: DeterminateSystems/flakehub-cache-action@v3
 
       - name: Build qcow2 image
         working-directory: nixos

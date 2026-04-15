@@ -56,8 +56,6 @@ in
 
   # Separate docker data disk mounted at /var/lib/docker.
   # We expect a second virtio disk (vdb). We format it once if empty, then mount by label.
-  environment.systemPackages = with pkgs; [ util-linux e2fsprogs ];
-
   systemd.services.init-docker-disk = {
     description = "Initialize docker data disk if needed";
     wantedBy = [ "local-fs.target" ];
@@ -86,6 +84,8 @@ in
 
   # Minimal tooling; keep image light.
   environment.systemPackages = with pkgs; [
+    util-linux
+    e2fsprogs
     docker
     git
     curl

@@ -1,4 +1,4 @@
-{ config, pkgs, lib, ... }:
+{ config, pkgs, lib, modulesPath, ... }:
 
 let
   # Keep the image generic; per-machine SSH keys come from cloud-init seed ISO.
@@ -7,7 +7,7 @@ in
 {
   imports = [
     # Adds sane defaults for QEMU guests.
-    (pkgs.path + "/nixos/modules/profiles/qemu-guest.nix")
+    (modulesPath + "/profiles/qemu-guest.nix")
   ];
 
   time.timeZone = "UTC";

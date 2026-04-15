@@ -33,7 +33,7 @@ in
       X11Forwarding = false;
       AllowAgentForwarding = "no";
       AllowTcpForwarding = "no";
-      PrintMotd = "no";
+      PrintMotd = false;
     };
   };
 

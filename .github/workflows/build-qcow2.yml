@@ -27,9 +27,20 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
-          # nixos-generators puts the qcow2 in result/; name can vary, normalize it.
-          QCOW2="$(find nixos/result -maxdepth 1 \( -type f -o -type l \) -name '*.qcow2' -print -quit)"
-          test -n "$QCOW2"
+          echo "Debug: nixos/result listing"
+          ls -la nixos/result || true
+          echo "Debug: nixos/result resolved"
+          readlink -f nixos/result || true
+
+          # nixos-generators output may be a symlink and the qcow2 can be nested.
+          QCOW2="$(find nixos/result -maxdepth 3 \( -type f -o -type l \) \( -name '*.qcow2' -o -name '*.qcow' \) -print -quit || true)"
+          if [ -z "${QCOW2}" ]; then
+            echo "ERROR: Could not locate qcow2 in nixos/result"
+            echo "Debug: tree (maxdepth 3)"
+            find nixos/result -maxdepth 3 -print || true
+            exit 1
+          fi
+          echo "Using image: ${QCOW2}"
           cp "$QCOW2" "dist/nix-docker-vm.qcow2"
           (cd dist && sha256sum nix-docker-vm.qcow2 > nix-docker-vm.qcow2.sha256)
           echo "Built: $(sha256sum dist/nix-docker-vm.qcow2)"

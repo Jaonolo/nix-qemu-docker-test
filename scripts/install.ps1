@@ -34,7 +34,8 @@ try {
     LogsDir          = (Join-Path $RepoRoot 'state\logs')
 
     BaseOsImagePath  = (Join-Path $RepoRoot 'artifacts\nix-docker-vm.qcow2')
-    BaseOsShaPath    = (Join-Path $RepoRoot 'artifacts\nix-docker-vm.qcow2.sha256')
+    BaseOsZstPath    = (Join-Path $RepoRoot 'artifacts\nix-docker-vm.qcow2.zst')
+    BaseOsZstShaPath = (Join-Path $RepoRoot 'artifacts\nix-docker-vm.qcow2.zst.sha256')
     OsOverlayPath    = (Join-Path $RepoRoot 'state\os-overlay.qcow2')
     DockerDataPath   = (Join-Path $RepoRoot 'state\docker-data.qcow2')
     CloudInitDir     = (Join-Path $RepoRoot 'state\cloud-init')
@@ -58,7 +59,8 @@ try {
     'qemu',
     'docker',
     'openssh',
-    'cdrtools'
+    'cdrtools',
+    'zstd'
   )
 
   Assert-Command git
@@ -139,28 +141,37 @@ package_upgrade: false
     Get-ReleaseByTag -Owner $Config.ImageOwner -Repo $Config.ImageRepo -Tag $Config.ImageTag
   }
 
-  $qcow2Url = Get-AssetUrlByName -ReleaseJson $release -AssetName 'nix-docker-vm.qcow2'
-  $shaUrl   = Get-AssetUrlByName -ReleaseJson $release -AssetName 'nix-docker-vm.qcow2.sha256'
-  if (-not $qcow2Url -or -not $shaUrl) {
-    throw "Release does not contain expected assets: nix-docker-vm.qcow2 and nix-docker-vm.qcow2.sha256"
+  $zstUrl = Get-AssetUrlByName -ReleaseJson $release -AssetName 'nix-docker-vm.qcow2.zst'
+  $shaUrl = Get-AssetUrlByName -ReleaseJson $release -AssetName 'nix-docker-vm.qcow2.zst.sha256'
+  if (-not $zstUrl -or -not $shaUrl) {
+    throw "Release does not contain expected assets: nix-docker-vm.qcow2.zst and nix-docker-vm.qcow2.zst.sha256"
   }
+
+  Write-Log INFO "Downloading sha256 checksum..."
+  Download-Asset -Url $shaUrl -OutFile $Config.BaseOsZstShaPath
+
+  if (-not (Test-Path -LiteralPath $Config.BaseOsZstPath)) {
+    Write-Log INFO "Downloading compressed base OS image (qcow2.zst)..."
+    Download-Asset -Url $zstUrl -OutFile $Config.BaseOsZstPath
+  } else {
+    Write-Log INFO "Compressed base OS image already present."
+  }
+
+  $expected = (Get-Content -LiteralPath $Config.BaseOsZstShaPath -Raw).Trim().Split(' ')[0]
+  if (-not $expected -or $expected.Length -lt 32) { throw "Checksum file looks invalid: $($Config.BaseOsZstShaPath)" }
+  $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $Config.BaseOsZstPath).Hash.ToLowerInvariant()
+  if ($actual -ne $expected.ToLowerInvariant()) {
+    throw "qcow2.zst checksum mismatch.`nExpected: $expected`nActual:   $actual"
+  }
+  Write-Log INFO "qcow2.zst checksum verified."
 
   if (-not (Test-Path -LiteralPath $Config.BaseOsImagePath)) {
-    Write-Log INFO "Downloading qcow2 base OS image..."
-    Download-Asset -Url $qcow2Url -OutFile $Config.BaseOsImagePath
+    Write-Log INFO "Decompressing qcow2.zst -> qcow2..."
+    Assert-Command zstd
+    & zstd -d -f -o $Config.BaseOsImagePath $Config.BaseOsZstPath | Out-Null
   } else {
-    Write-Log INFO "Base OS image already present."
+    Write-Log INFO "Decompressed base OS image already present."
   }
-  Write-Log INFO "Downloading sha256 checksum..."
-  Download-Asset -Url $shaUrl -OutFile $Config.BaseOsShaPath
-
-  $expected = (Get-Content -LiteralPath $Config.BaseOsShaPath -Raw).Trim().Split(' ')[0]
-  if (-not $expected -or $expected.Length -lt 32) { throw "Checksum file looks invalid: $($Config.BaseOsShaPath)" }
-  $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $Config.BaseOsImagePath).Hash.ToLowerInvariant()
-  if ($actual -ne $expected.ToLowerInvariant()) {
-    throw "qcow2 checksum mismatch.`nExpected: $expected`nActual:   $actual"
-  }
-  Write-Log INFO "qcow2 checksum verified."
 
   # =========================
   # Create OS overlay (immutable-style base) + docker data disk

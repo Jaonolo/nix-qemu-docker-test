@@ -51,8 +51,10 @@ jobs:
           fi
           echo "Using image: ${QCOW2}"
           cp "$QCOW2" "dist/nix-docker-vm.qcow2"
-          (cd dist && sha256sum nix-docker-vm.qcow2 > nix-docker-vm.qcow2.sha256)
-          echo "Built: $(sha256sum dist/nix-docker-vm.qcow2)"
+          echo "Compressing qcow2 for GitHub Releases..."
+          zstd -T0 -19 --rm "dist/nix-docker-vm.qcow2" -o "dist/nix-docker-vm.qcow2.zst"
+          (cd dist && sha256sum nix-docker-vm.qcow2.zst > nix-docker-vm.qcow2.zst.sha256)
+          echo "Built: $(sha256sum dist/nix-docker-vm.qcow2.zst)"
 
       - name: Create version tag
         id: version
@@ -70,6 +72,6 @@ jobs:
           name: ${{ steps.version.outputs.tag }}
           generate_release_notes: true
           files: |
-            dist/nix-docker-vm.qcow2
-            dist/nix-docker-vm.qcow2.sha256
+            dist/nix-docker-vm.qcow2.zst
+            dist/nix-docker-vm.qcow2.zst.sha256
 

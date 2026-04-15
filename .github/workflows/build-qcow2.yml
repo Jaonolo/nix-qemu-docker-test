@@ -28,7 +28,7 @@ jobs:
           set -euo pipefail
           mkdir -p dist
           # nixos-generators puts the qcow2 in result/; name can vary, normalize it.
-          QCOW2="$(find nixos/result -maxdepth 1 -type f -name '*.qcow2' | head -n 1)"
+          QCOW2="$(find nixos/result -maxdepth 1 \( -type f -o -type l \) -name '*.qcow2' -print -quit)"
           test -n "$QCOW2"
           cp "$QCOW2" "dist/nix-docker-vm.qcow2"
           (cd dist && sha256sum nix-docker-vm.qcow2 > nix-docker-vm.qcow2.sha256)

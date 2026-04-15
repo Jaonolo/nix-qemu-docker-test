@@ -30,14 +30,23 @@ jobs:
           echo "Debug: nixos/result listing"
           ls -la nixos/result || true
           echo "Debug: nixos/result resolved"
-          readlink -f nixos/result || true
+          RESOLVED="$(readlink -f nixos/result || true)"
+          echo "${RESOLVED}"
 
           # nixos-generators output may be a symlink and the qcow2 can be nested.
-          QCOW2="$(find nixos/result -maxdepth 3 \( -type f -o -type l \) \( -name '*.qcow2' -o -name '*.qcow' \) -print -quit || true)"
+          QCOW2="$(find -L nixos/result -maxdepth 3 -type f \( -name '*.qcow2' -o -name '*.qcow' \) -print -quit || true)"
+          if [ -z "${QCOW2}" ] && [ -n "${RESOLVED}" ] && [ -d "${RESOLVED}" ]; then
+            echo "Debug: searching resolved store path"
+            QCOW2="$(find "${RESOLVED}" -maxdepth 3 -type f \( -name '*.qcow2' -o -name '*.qcow' \) -print -quit || true)"
+          fi
           if [ -z "${QCOW2}" ]; then
             echo "ERROR: Could not locate qcow2 in nixos/result"
             echo "Debug: tree (maxdepth 3)"
-            find nixos/result -maxdepth 3 -print || true
+            find -L nixos/result -maxdepth 3 -print || true
+            if [ -n "${RESOLVED}" ]; then
+              echo "Debug: resolved path tree (maxdepth 3)"
+              find "${RESOLVED}" -maxdepth 3 -print || true
+            fi
             exit 1
           fi
           echo "Using image: ${QCOW2}"

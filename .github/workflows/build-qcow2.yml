@@ -1,0 +1,58 @@
+name: build-qcow2
+
+on:
+  push:
+    branches: [ "main" ]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v16
+
+      - name: Enable Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@v9
+
+      - name: Build qcow2 image
+        working-directory: nixos
+        run: |
+          nix build .#qcow2 --print-build-logs
+          ls -la result
+
+      - name: Prepare release assets
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          # nixos-generators puts the qcow2 in result/; name can vary, normalize it.
+          QCOW2="$(find nixos/result -maxdepth 1 -type f -name '*.qcow2' | head -n 1)"
+          test -n "$QCOW2"
+          cp "$QCOW2" "dist/nix-docker-vm.qcow2"
+          (cd dist && sha256sum nix-docker-vm.qcow2 > nix-docker-vm.qcow2.sha256)
+          echo "Built: $(sha256sum dist/nix-docker-vm.qcow2)"
+
+      - name: Create version tag
+        id: version
+        run: |
+          set -euo pipefail
+          SHORT_SHA="${GITHUB_SHA::7}"
+          TS="$(date -u +%Y%m%d-%H%M%S)"
+          TAG="qcow2-${TS}-${SHORT_SHA}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
+          generate_release_notes: true
+          files: |
+            dist/nix-docker-vm.qcow2
+            dist/nix-docker-vm.qcow2.sha256
+

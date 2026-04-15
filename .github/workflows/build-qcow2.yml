@@ -23,7 +23,7 @@ jobs:
       - name: Build qcow2 image
         working-directory: nixos
         run: |
-          nix build .#qcow2 --print-build-logs
+          nix build .#qcow2 --print-build-logs --no-write-lock-file
           ls -la result
 
       - name: Prepare release assets

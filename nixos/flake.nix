@@ -2,8 +2,9 @@
   description = "NixOS Docker runner VM (QEMU) - declarative config";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
-    nixos-generators.url = "github:nix-community/nixos-generators";
+    # Pin exact revisions so builds are reproducible without a flake.lock.
+    nixpkgs.url = "github:NixOS/nixpkgs/7e495b747b51f95ae15e74377c5ce1fe69c1765f";
+    nixos-generators.url = "github:nix-community/nixos-generators/8946737ff703382fda7623b9fab071d037e897d5";
     nixos-generators.inputs.nixpkgs.follows = "nixpkgs";
   };
 
@@ -24,7 +25,7 @@
 
       packages.${system}.qcow2 = nixos-generators.nixosGenerate {
         inherit system;
-        format = "qcow2";
+        format = "qcow";
         modules = [ ./image.nix ];
       };
 

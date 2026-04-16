@@ -38,12 +38,8 @@ in
   };
 
   users.users.root.hashedPassword = "!";
-
-  # Precreate the intended user; cloud-init can still manage authorized keys.
-  users.users.${sshUser} = {
-    isNormalUser = true;
-    extraGroups = [ "docker" ];
-  };
+  # Let cloud-init create the login user and manage its SSH keys from NoCloud.
+  users.mutableUsers = true;
 
   # Docker Engine (no TCP listener).
   virtualisation.docker = {

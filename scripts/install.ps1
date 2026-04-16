@@ -22,8 +22,8 @@ try {
     AutoUseContext   = $true
 
     # GitHub repo that publishes qcow2 releases (this repo).
-    ImageOwner       = 'REPLACE_ME'
-    ImageRepo        = 'REPLACE_ME'
+    ImageOwner       = 'Jaonolo'
+    ImageRepo        = 'nix-qemu-docker-test'
     # Version pinning:
     # - '' => latest release
     # - 'qcow2-YYYYMMDD-HHMMSS-<sha7>' => specific tag
@@ -124,54 +124,60 @@ package_upgrade: false
 
   Write-Log INFO "Creating cloud-init seed ISO..."
   if (Test-Path -LiteralPath $Config.CloudInitIsoPath) { Remove-Item -LiteralPath $Config.CloudInitIsoPath -Force }
-  & mkisofs -quiet -output $Config.CloudInitIsoPath -volid cidata -joliet -rock $userDataPath $metaDataPath | Out-Null
-
-  # =========================
-  # Download qcow2 (release) + verify checksum
-  # =========================
-  if ($Config.ImageOwner -eq 'REPLACE_ME' -or $Config.ImageRepo -eq 'REPLACE_ME') {
-    throw "Set Config.ImageOwner and Config.ImageRepo in scripts/install.ps1 to your GitHub repo (owner/name) that publishes qcow2 releases."
+  Push-Location $Config.CloudInitDir
+  try {
+    # NoCloud expects files named exactly "user-data" and "meta-data" at the ISO root.
+    & mkisofs -quiet -output $Config.CloudInitIsoPath -volid cidata -rock 'user-data' 'meta-data' | Out-Null
+  } finally {
+    Pop-Location
   }
 
-  $release = if ([string]::IsNullOrWhiteSpace($Config.ImageTag)) {
-    Write-Log INFO "Resolving latest GitHub Release for $($Config.ImageOwner)/$($Config.ImageRepo)..."
-    Get-LatestRelease -Owner $Config.ImageOwner -Repo $Config.ImageRepo
-  } else {
-    Write-Log INFO "Resolving GitHub Release tag '$($Config.ImageTag)' for $($Config.ImageOwner)/$($Config.ImageRepo)..."
-    Get-ReleaseByTag -Owner $Config.ImageOwner -Repo $Config.ImageRepo -Tag $Config.ImageTag
-  }
+  # # =========================
+  # # Download qcow2 (release) + verify checksum
+  # # =========================
+  # if ($Config.ImageOwner -eq 'REPLACE_ME' -or $Config.ImageRepo -eq 'REPLACE_ME') {
+  #   throw "Set Config.ImageOwner and Config.ImageRepo in scripts/install.ps1 to your GitHub repo (owner/name) that publishes qcow2 releases."
+  # }
 
-  $zstUrl = Get-AssetUrlByName -ReleaseJson $release -AssetName 'nix-docker-vm.qcow2.zst'
-  $shaUrl = Get-AssetUrlByName -ReleaseJson $release -AssetName 'nix-docker-vm.qcow2.zst.sha256'
-  if (-not $zstUrl -or -not $shaUrl) {
-    throw "Release does not contain expected assets: nix-docker-vm.qcow2.zst and nix-docker-vm.qcow2.zst.sha256"
-  }
+  # $release = if ([string]::IsNullOrWhiteSpace($Config.ImageTag)) {
+  #   Write-Log INFO "Resolving latest GitHub Release for $($Config.ImageOwner)/$($Config.ImageRepo)..."
+  #   Get-LatestRelease -Owner $Config.ImageOwner -Repo $Config.ImageRepo
+  # } else {
+  #   Write-Log INFO "Resolving GitHub Release tag '$($Config.ImageTag)' for $($Config.ImageOwner)/$($Config.ImageRepo)..."
+  #   Get-ReleaseByTag -Owner $Config.ImageOwner -Repo $Config.ImageRepo -Tag $Config.ImageTag
+  # }
 
-  Write-Log INFO "Downloading sha256 checksum..."
-  Download-Asset -Url $shaUrl -OutFile $Config.BaseOsZstShaPath
+  # $zstUrl = Get-AssetUrlByName -ReleaseJson $release -AssetName 'nix-docker-vm.qcow2.zst'
+  # $shaUrl = Get-AssetUrlByName -ReleaseJson $release -AssetName 'nix-docker-vm.qcow2.zst.sha256'
+  # if (-not $zstUrl -or -not $shaUrl) {
+  #   throw "Release does not contain expected assets: nix-docker-vm.qcow2.zst and nix-docker-vm.qcow2.zst.sha256"
+  # }
 
-  if (-not (Test-Path -LiteralPath $Config.BaseOsZstPath)) {
-    Write-Log INFO "Downloading compressed base OS image (qcow2.zst)..."
-    Download-Asset -Url $zstUrl -OutFile $Config.BaseOsZstPath
-  } else {
-    Write-Log INFO "Compressed base OS image already present."
-  }
+  # Write-Log INFO "Downloading sha256 checksum..."
+  # Download-Asset -Url $shaUrl -OutFile $Config.BaseOsZstShaPath
 
-  $expected = (Get-Content -LiteralPath $Config.BaseOsZstShaPath -Raw).Trim().Split(' ')[0]
-  if (-not $expected -or $expected.Length -lt 32) { throw "Checksum file looks invalid: $($Config.BaseOsZstShaPath)" }
-  $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $Config.BaseOsZstPath).Hash.ToLowerInvariant()
-  if ($actual -ne $expected.ToLowerInvariant()) {
-    throw "qcow2.zst checksum mismatch.`nExpected: $expected`nActual:   $actual"
-  }
-  Write-Log INFO "qcow2.zst checksum verified."
+  # if (-not (Test-Path -LiteralPath $Config.BaseOsZstPath)) {
+  #   Write-Log INFO "Downloading compressed base OS image (qcow2.zst)..."
+  #   Download-Asset -Url $zstUrl -OutFile $Config.BaseOsZstPath
+  # } else {
+  #   Write-Log INFO "Compressed base OS image already present."
+  # }
 
-  if (-not (Test-Path -LiteralPath $Config.BaseOsImagePath)) {
-    Write-Log INFO "Decompressing qcow2.zst -> qcow2..."
-    Assert-Command zstd
-    & zstd -d -f -o $Config.BaseOsImagePath $Config.BaseOsZstPath | Out-Null
-  } else {
-    Write-Log INFO "Decompressed base OS image already present."
-  }
+  # $expected = (Get-Content -LiteralPath $Config.BaseOsZstShaPath -Raw).Trim().Split(' ')[0]
+  # if (-not $expected -or $expected.Length -lt 32) { throw "Checksum file looks invalid: $($Config.BaseOsZstShaPath)" }
+  # $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $Config.BaseOsZstPath).Hash.ToLowerInvariant()
+  # if ($actual -ne $expected.ToLowerInvariant()) {
+  #   throw "qcow2.zst checksum mismatch.`nExpected: $expected`nActual:   $actual"
+  # }
+  # Write-Log INFO "qcow2.zst checksum verified."
+
+  # if (-not (Test-Path -LiteralPath $Config.BaseOsImagePath)) {
+  #   Write-Log INFO "Decompressing qcow2.zst -> qcow2..."
+  #   Assert-Command zstd
+  #   & zstd -d -f -o $Config.BaseOsImagePath $Config.BaseOsZstPath | Out-Null
+  # } else {
+  #   Write-Log INFO "Decompressed base OS image already present."
+  # }
 
   # =========================
   # Create OS overlay (immutable-style base) + docker data disk
@@ -190,15 +196,15 @@ package_upgrade: false
     Write-Log INFO "Docker data disk already present."
   }
 
-  # =========================
-  # Create Docker context (SSH)
-  # =========================
-  Ensure-DockerContextSsh -ContextName $Config.DockerContext -SshUser $Config.GuestSshUser -SshPort $Config.HostSshPort `
-    -Description "Docker Engine inside NixOS VM via SSH (QEMU on Windows, local-only)."
+  # # =========================
+  # # Create Docker context (SSH)
+  # # =========================
+  # Ensure-DockerContextSsh -ContextName $Config.DockerContext -SshUser $Config.GuestSshUser -SshPort $Config.HostSshPort `
+  #   -Description "Docker Engine inside NixOS VM via SSH (QEMU on Windows, local-only)."
 
-  if ($Config.AutoUseContext) {
-    Set-DockerContextCurrent -ContextName $Config.DockerContext
-  }
+  # if ($Config.AutoUseContext) {
+  #   Set-DockerContextCurrent -ContextName $Config.DockerContext
+  # }
 
   Write-Log INFO "Install complete."
   Write-Host ""

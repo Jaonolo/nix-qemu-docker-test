@@ -11,18 +11,8 @@
   outputs = { self, nixpkgs, nixos-generators }:
     let
       system = "x86_64-linux";
-      pkgs = import nixpkgs { inherit system; };
     in
     {
-      nixosConfigurations.nix-docker-vm = nixpkgs.lib.nixosSystem {
-        inherit system;
-        modules = [
-          ({ ... }: {
-            imports = [ ./configuration.nix ];
-          })
-        ];
-      };
-
       packages.${system}.qcow2 = nixos-generators.nixosGenerate {
         inherit system;
         format = "qcow";

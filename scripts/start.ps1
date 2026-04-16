@@ -14,7 +14,7 @@ try {
     VmName        = 'nix-docker-vm'
     VmMemoryMb    = 2048
     VmCores       = 2
-    HostSshPort   = 2222
+    HostSshPort   = 2224
     GuestSshUser  = 'dockervm'
     DockerContext = 'nix-docker-vm'
 

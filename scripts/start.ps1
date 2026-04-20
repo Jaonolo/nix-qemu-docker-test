@@ -46,16 +46,19 @@ try {
   # =========================
   # Detect already-running VM
   # =========================
+  $shouldLaunchVm = $true
   if (Test-Path -LiteralPath $Config.PidFile) {
     $pid = (Get-Content -LiteralPath $Config.PidFile -Raw).Trim()
     if ($pid -match '^\d+$') {
       $proc = Get-Process -Id ([int]$pid) -ErrorAction SilentlyContinue
       if ($proc) {
         Write-Log INFO "VM appears to already be running (PID $pid). Skipping launch."
-        goto WaitForSsh
+        $shouldLaunchVm = $false
       }
     }
-    Remove-Item -LiteralPath $Config.PidFile -Force -ErrorAction SilentlyContinue
+    if ($shouldLaunchVm) {
+      Remove-Item -LiteralPath $Config.PidFile -Force -ErrorAction SilentlyContinue
+    }
   }
 
   # =========================
@@ -75,29 +78,30 @@ try {
   # =========================
   # Start QEMU
   # =========================
-  if (Test-Path -LiteralPath $Config.SerialLog) { Remove-Item -LiteralPath $Config.SerialLog -Force }
+  if ($shouldLaunchVm) {
+    if (Test-Path -LiteralPath $Config.SerialLog) { Remove-Item -LiteralPath $Config.SerialLog -Force }
 
-  $osArg = "file=$($Config.OsOverlayPath),if=virtio,format=qcow2,cache=writeback"
-  $dataArg = "file=$($Config.DockerDataPath),if=virtio,format=qcow2,cache=writeback"
-  $qemuArgs = @(
-    '-name', $Config.VmName,
-    '-m', "$($Config.VmMemoryMb)",
-    '-smp', "$($Config.VmCores)",
-    '-display', 'none',
-    '-serial', ("file:$($Config.SerialLog)"),
-    '-accel', $accelArg,
-    '-drive', $osArg,
-    '-drive', $dataArg,
-    '-drive', ("file=$($Config.CloudInitIso),media=cdrom,readonly=on"),
-    '-netdev', ("user,id=net0,hostfwd=tcp:127.0.0.1:$($Config.HostSshPort)-:22"),
-    '-device', 'virtio-net-pci,netdev=net0'
-  )
+    $osArg = "file=$($Config.OsOverlayPath),if=virtio,format=qcow2,cache=writeback"
+    $dataArg = "file=$($Config.DockerDataPath),if=virtio,format=qcow2,cache=writeback"
+    $qemuArgs = @(
+      '-name', $Config.VmName,
+      '-m', "$($Config.VmMemoryMb)",
+      '-smp', "$($Config.VmCores)",
+      '-display', 'none',
+      '-serial', ("file:$($Config.SerialLog)"),
+      '-accel', $accelArg,
+      '-drive', $osArg,
+      '-drive', $dataArg,
+      '-drive', ("file=$($Config.CloudInitIso),media=cdrom,readonly=on"),
+      '-netdev', ("user,id=net0,hostfwd=tcp:127.0.0.1:$($Config.HostSshPort)-:22"),
+      '-device', 'virtio-net-pci,netdev=net0'
+    )
 
-  Write-Log INFO "Starting VM..."
-  $p = Start-Process -FilePath (Get-Command qemu-system-x86_64).Path -ArgumentList $qemuArgs -PassThru -WindowStyle Hidden
-  Set-Content -LiteralPath $Config.PidFile -Value $p.Id -Encoding ASCII
+    Write-Log INFO "Starting VM..."
+    $p = Start-Process -FilePath (Get-Command qemu-system-x86_64).Path -ArgumentList $qemuArgs -PassThru -WindowStyle Hidden
+    Set-Content -LiteralPath $Config.PidFile -Value $p.Id -Encoding ASCII
+  }
 
-  :WaitForSsh
   # =========================
   # Wait for SSH and validate Docker connectivity
   # =========================

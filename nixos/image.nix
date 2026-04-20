@@ -33,9 +33,11 @@ in
       X11Forwarding = false;
       AllowAgentForwarding = "no";
       AllowTcpForwarding = true;
-      PermitOpen = [ "127.0.0.1:80" "127.0.0.1:8080" ];
       PrintMotd = false;
     };
+    extraConfig = ''
+      PermitOpen any
+    '';
   };
 
   users.users.root.hashedPassword = "!";
